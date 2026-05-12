@@ -14,18 +14,42 @@ st.markdown("""
 <style>
     .stApp { background-color: #F8F9FA; color: #2C3E50; font-family: 'Arial', sans-serif;}
     .lab-box { background-color: #FFFFFF; padding: 20px; border-radius: 8px; border-left: 5px solid #2980B9; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .display-lcd { background-color: #D5F5E3; color: #0E6251; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; padding: 10px; border-radius: 5px; text-align: center; border: 2px inset #1ABC9C;}
+    .display-lcd { background-color: #D5F5E3; color: #0E6251; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; padding: 10px; border-radius: 5px; text-align: right; border: 2px inset #1ABC9C;}
     section[data-testid="stSidebar"] { background-color: #FFFFFF !important; border-right: 3px solid #2980B9; }
 </style>
 """, unsafe_allow_html=True)
 
+# Diccionario Bilingüe
+T = {
+    'title': {'es': '🏭 Laboratorio Interactivo: Producción de Biodiésel', 'en': '🏭 Interactive Lab: Biodiesel Production'},
+    'tab1': {'es': '1. Calculadora Estequiométrica', 'en': '1. Stoichiometric Calculator'},
+    'tab2': {'es': '2. Reactor R-201 (Live)', 'en': '2. Reactor R-201 (Live)'},
+    'tab3': {'es': '3. Decantador D-301', 'en': '3. Decanter D-301'},
+    'tab4': {'es': '4. Certificación NTC 5444', 'en': '4. NTC 5444 Certification'}
+}
+
+if 'lang' not in st.session_state: st.session_state.lang = "es"
+def t(key): return T.get(key, {}).get(st.session_state.lang, key)
+
 # ==========================================
-# 2. BASE DE DATOS DE MATRICES
+# 2. BASE DE DATOS DE MATRICES (AMPLIADA CON CONTEXTO)
 # ==========================================
 MUESTRAS = {
-    "OP-001 (AVU)": {"vol": 1200.0, "acidez_real": 1.5, "humedad": 4.5},
-    "OP-002 (Grasa Pollo)": {"vol": 800.0, "acidez_real": 6.8, "humedad": 0.2},
-    "OP-003 (Aceite Palma)": {"vol": 1500.0, "acidez_real": 2.8, "humedad": 1.8}
+    "OP-001 (AVU)": {
+        "vol": 1200.0, "acidez_real": 1.5, "humedad": 4.5, 
+        "tipo": "Aceite Vegetal Usado (AVU)", 
+        "desc": "Recolectado de restaurantes. Presenta alta humedad por procesos de fritura profunda."
+    },
+    "OP-002 (Grasa Pollo)": {
+        "vol": 800.0, "acidez_real": 6.8, "humedad": 0.2, 
+        "tipo": "Grasa Animal Degradada", 
+        "desc": "Baja humedad, pero se sospecha de una acidez extremadamente alta por descomposición orgánica."
+    },
+    "OP-003 (Aceite Palma)": {
+        "vol": 1500.0, "acidez_real": 2.8, "humedad": 1.8, 
+        "tipo": "Aceite Crudo de Palma", 
+        "desc": "Alta densidad y volumen. Humedad moderada. Requiere atención en la inercia térmica del reactor."
+    }
 }
 
 # ==========================================
@@ -226,6 +250,14 @@ st.sidebar.warning(f"**Total Muestras Turno:** {st.session_state.total_muestras_
 # ==========================================
 st.markdown(f"<h2 style='color:#2C3E50; border-bottom: 3px solid #2980B9;'>🔬 Operaciones Unitarias: {st.session_state.op_actual}</h2>", unsafe_allow_html=True)
 
+# --- NUEVA FICHA TÉCNICA (CONTEXTO DE LA MUESTRA) ---
+st.info(f"📋 **FICHA TÉCNICA DE LA MUESTRA**\n"
+        f"- **Tipo de Matriz:** {datos_op['tipo']}\n"
+        f"- **Descripción:** {datos_op['desc']}\n"
+        f"- **Volumen a Procesar:** {datos_op['vol']} mL\n"
+        f"- **Humedad Inicial (Sensor MI-101):** {datos_op['humedad']}% *(Tratar en Pestaña 1 si >0.5%)*\n"
+        f"- **Índice de Acidez (FFA):** ❓ *Desconocido. Requiere titulación química (Pestaña 1).*")
+
 tab1, tab2, tab3, tab4 = st.tabs(["1. Lab Analítico (Química)", "2. Reactor R-201 (SCADA)", "3. Decantador y Lavado", "4. Certificación NTC"])
 
 # ---------------------------------------------------------
@@ -253,11 +285,11 @@ with tab1:
         if c_2.button("💧 + 0.1 mL"): st.session_state.volumen_titulante += 0.1; st.rerun()
         if c_3.button("🔄 Vaciar Bureta"): st.session_state.volumen_titulante = 0.0; st.rerun()
         
-        st.markdown(f"<div class='display-lcd'>{st.session_state.volumen_titulante:.1f} mL</div>", unsafe_allow_html=True)
-        components.html(html_titulacion(st.session_state.volumen_titulante, vol_meta, st.session_state.fenolftaleina_agregada), height=350)
+        components.html(html_titulacion(st.session_state.volumen_titulante, vol_meta, st.session_state.fenolftaleina_agregada), height=380)
         
-        st.markdown("**Ecuación de Índice de Acidez:**")
-        st.latex(r"IA = \frac{Vol_{gastado} \times 0.1 \times 56.1}{10}")
+        if st.session_state.volumen_titulante > 0:
+            st.markdown("**Ecuación de Índice de Acidez:**")
+            st.latex(r"IA = \frac{Vol_{gastado} \times 0.1 \times 56.1}{10}")
 
     with col_b:
         st.markdown("""<div class="lab-box">
@@ -270,7 +302,7 @@ with tab1:
         if st.button("🔥 Activar Secado Inicial por Vacío", use_container_width=True):
             if st.session_state.humedad_actual > 0.1:
                 st.session_state.humedad_actual = 0.05
-                st.success("✅ Secado exitoso. Riesgo de saponificación por humedad mitigado.")
+                st.success("✅ Secado exitoso. Riesgo de saponificación mitigado.")
                 st.rerun()
                 
         st.markdown("---")
@@ -284,20 +316,20 @@ with tab1:
             peso_input = st.number_input("Peso NaOH (g):", min_value=0.0, step=0.1, value=st.session_state.peso_balanza)
             st.session_state.peso_balanza = peso_input
             st.markdown(f"<div class='display-lcd'>{st.session_state.peso_balanza:.1f} g</div>", unsafe_allow_html=True)
-            components.html(html_balanza(st.session_state.peso_balanza), height=200)
+            components.html(html_balanza(st.session_state.peso_balanza), height=230)
             
         with c_prob:
             met_input = st.number_input("Volumen Metanol (mL):", min_value=0.0, step=10.0, value=st.session_state.met_ingresado)
             st.session_state.met_ingresado = met_input
             st.markdown(f"<div class='display-lcd'>{st.session_state.met_ingresado:.0f} mL</div>", unsafe_allow_html=True)
-            components.html(html_probeta(st.session_state.met_ingresado), height=200)
+            components.html(html_probeta(st.session_state.met_ingresado), height=230)
 
 # ---------------------------------------------------------
 # PESTAÑA 2: REACTOR SCADA
 # ---------------------------------------------------------
 with tab2:
     st.markdown("#### HMI: Control Termodinámico R-201")
-    st.info("💡 **Dinámica de Planta:** El reactor posee inercia térmica. La temperatura subirá gradualmente y tardará en bajar si apaga la resistencia. Si calienta la mezcla sin encender el agitador, el aceite en contacto con la resistencia se degradará térmicamente.")
+    st.info("💡 **Dinámica de Planta:** El reactor posee inercia térmica. La temperatura subirá gradualmente y tardará en bajar si apaga la resistencia. Si calienta la mezcla sin encender el agitador, el aceite se degradará térmicamente.")
     
     if st.session_state.fase_rx_completada:
         st.success("✅ Reacción completada. Proceda a la pestaña 3.")
@@ -310,7 +342,6 @@ with tab2:
             
             st.markdown(f"**Tiempo de Reacción:** {st.session_state.tiempo_rx} / 45 Minutos")
             
-            # --- REGLA HSE: DEGRADACIÓN TÉRMICA ---
             if pwr_res > 0 and rpm_val == 0:
                 st.error("🚨 ALARMA HSE: Degradación Térmica Localizada por falta de agitación.")
                 st.session_state.degradacion_termica = True
@@ -318,7 +349,6 @@ with tab2:
             if st.button("⏱️ Avanzar 5 Minutos (Control Manual)", type="primary", use_container_width=True):
                 st.session_state.valvula_metoxido = v_met
                 
-                # Inercia térmica realista
                 dT = (pwr_res * 0.45) - ((st.session_state.temp_rx - 25.0) * 0.05)
                 st.session_state.temp_rx += dT
                 st.session_state.temp_rx = max(25.0, st.session_state.temp_rx)
@@ -357,7 +387,7 @@ with tab2:
 # ---------------------------------------------------------
 with tab3:
     st.markdown("#### Separación de Fases y Lavado Químico (D-301)")
-    st.info("💡 **Procedimiento:** El producto crudo contiene restos de catalizador alcalino (pH alto). Añadir agua neutraliza el pH, pero emulsiona agua en el biodiésel. Debe aplicar un secado final antes de certificar.")
+    st.info("💡 **Procedimiento:** Añadir agua neutraliza el pH, pero emulsiona agua en el biodiésel. Debe aplicar un secado final antes de certificar.")
     
     if not st.session_state.fase_rx_completada:
         st.warning("⚠️ Debe sintetizar el biocombustible en el R-201 primero.")
@@ -382,18 +412,16 @@ with tab3:
             
             st.markdown("---")
             st.markdown("**Control Químico (Lavado y Secado)**")
-            
-            # --- TRAMPA DE HUMEDAD EN LAVADO ---
             if st.button("🚿 Añadir Agua de Lavado (Bajar pH)", use_container_width=True):
                 st.session_state.ph_metro = max(7.0, st.session_state.ph_metro - 0.5)
-                st.session_state.humedad_actual = 8.0  # Dispara la humedad
+                st.session_state.humedad_actual = 8.0 
                 st.rerun()
                 
             if st.session_state.humedad_actual > 0.5 and st.session_state.progreso_dec > 0.0:
-                st.warning("⚠️ Alta humedad detectada por retención de agua de lavado. Requiere secado final.")
+                st.warning("⚠️ Alta humedad detectada por retención de agua de lavado.")
                 if st.button("🔥 Secado Final por Evaporación (TK-302)", use_container_width=True):
                     st.session_state.humedad_actual = 0.05
-                    st.success("✅ Secado final exitoso. Humedad en rangos seguros.")
+                    st.success("✅ Secado final exitoso.")
                     st.rerun()
 
             if st.session_state.hubo_saponificacion and st.session_state.progreso_dec > 0.4:
@@ -450,7 +478,7 @@ with tab4:
                 st.success("Lote registrado. Seleccione la siguiente matriz en el panel lateral.")
         else:
             st.error("❌ **LOTE RECHAZADO:** Causas Raíz detectadas:")
-            if st.session_state.hubo_saponificacion: st.write("- 🧼 **Saponificación:** Fallo en la titulación, pesaje incorrecto en la balanza o falta de secado inicial.")
+            if st.session_state.hubo_saponificacion: st.write("- 🧼 **Saponificación:** Fallo en la titulación (cálculo de IA), pesaje incorrecto en la balanza o falta de secado inicial.")
             if st.session_state.degradacion_termica: st.write("- 🌡️ **Degradación Térmica:** La resistencia se encendió sin agitación en el R-201.")
             if st.session_state.humedad_actual >= 0.5: st.write("- 💧 **Exceso de Humedad:** El producto no fue secado después del lavado.")
             if st.session_state.ph_metro > 7.5: st.write("- 🧪 **Alta Alcalinidad:** Faltó lavar el producto.")
