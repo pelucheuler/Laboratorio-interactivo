@@ -3,7 +3,11 @@ import streamlit.components.v1 as components
 import pandas as pd
 import time
 import random
+import requests 
 from datetime import datetime
+
+# <--- URL DE POWER BI --->
+POWER_BI_URL = "https://api.powerbi.com/beta/cbc2c381-2f2e-4d93-91d1-506c9316ace7/datasets/44afbca6-0e3e-4780-bd6e-b44995072977/rows?experience=power-bi&key=xYjQxS9CuNb%2FWodUgHS%2FEPhJhnDMyTP4WyWxNxus%2BPOVupsLqeJggUR5wJ%2FVsBwE1vRrUZUHncNYJ%2BIOQ13YXw%3D%3D"
 
 # ==========================================
 # 1. CONFIGURACIÓN DEL SISTEMA
@@ -463,6 +467,7 @@ with tab4:
         if aprobado:
             st.success("✅ **LOTE APROBADO:** El biocombustible cumple la Norma Técnica Nacional.")
             if st.button("💾 REGISTRAR LOTE", type="primary"):
+                # 1. Empaquetar los datos tal cual los tienes
                 registro = {
                     "Cuadrilla": st.session_state.ficha_grupo,
                     "Matriz": st.session_state.op_actual,
@@ -474,7 +479,21 @@ with tab4:
                     "pH_Final": st.session_state.ph_metro,
                     "OEE_Rendimiento_%": round(rend, 2)
                 }
+                
+                # 2. Guardar en la tabla local del simulador (trazabilidad)
                 st.session_state.resultados_turno.append(registro)
+                
+                # 3. ENVÍO DIRECTO A POWER BI
+                try:
+                    # Nota los corchetes [registro] que exige Power BI
+                    respuesta = requests.post(POWER_BI_URL, json=[registro]) 
+                    if respuesta.status_code == 200:
+                        st.success("✅ Lote registrado localmente y transmitido en vivo al Dashboard de Planta (Power BI).")
+                    else:
+                        st.warning(f"⚠️ Lote registrado localmente. Fallo de conexión con Power BI: Status {respuesta.status_code}")
+                except Exception as e:
+                    st.warning("⚠️ Lote registrado localmente. No hay conexión a internet para transmitir a Power BI.")
+                    
                 st.success("Lote registrado. Seleccione la siguiente matriz en el panel lateral.")
         else:
             st.error("❌ **LOTE RECHAZADO:** Causas Raíz detectadas:")
